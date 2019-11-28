@@ -1,4 +1,4 @@
--- Copyright 2006-2018 Mitchell mitchell.att.foicica.com. See License.txt.
+-- Copyright 2006-2019 Mitchell mitchell.att.foicica.com. See License.txt.
 -- Markdown LPeg lexer.
 
 local lexer = require('lexer')
@@ -6,6 +6,8 @@ local token, word_match = lexer.token, lexer.word_match
 local P, R, S = lpeg.P, lpeg.R, lpeg.S
 
 local lex = lexer.new('markdown')
+local inline_space = S('\t\v\f\r ')
+local blank_line = inline_space^0 * (P('\n') + -1)
 
 -- Block elements.
 lex:add_rule('header',
@@ -17,7 +19,7 @@ lex:add_rule('header',
              token('h1', lexer.starts_line('#') * lexer.nonnewline^0))
 local font_size = lexer.property_int['fontsize'] > 0 and
                   lexer.property_int['fontsize'] or 10
-local hstyle = lexer.STYLE_FUNCTION
+local hstyle = 'fore:$(color.red)'
 lex:add_style('h6', hstyle)
 lex:add_style('h5', hstyle..',size:'..(font_size + 1))
 lex:add_style('h4', hstyle..',size:'..(font_size + 2))
@@ -42,10 +44,10 @@ lex:add_rule('block_code',
              token('code', lexer.starts_line(P(' ')^4 + P('\t')) * -P('<') *
                            lexer.nonnewline^0 * lexer.newline^-1) +
              token('code', lexer.starts_line(P('```')) * (lexer.any - '```')^0 *
-                           P('```') * lexer.newline))
+                           P('```' * blank_line)^-1))
 lex:add_rule('inline_code',
-             token('code', lexer.starts_line(P('``')) * (lexer.any - '``')^0 * P('``')^-1 +
-                           lexer.delimited_range('`', false, true)))
+             token('code', P('``') * (lexer.any - ('\n' * blank_line) - '``')^0 * P('``')^-1 + 
+                           P('`') * (lexer.any - ('\n' * blank_line) - '`')^0 * P('`')^-1))
 lex:add_style('code', lexer.STYLE_EMBEDDED..',eolfilled')
 
 lex:add_rule('hr',
@@ -57,8 +59,8 @@ lex:add_rule('hr',
                               if line:find('[^'..c..']') or #line < 2 then
                                 return nil
                               end
-                              _, end_index = input:find('\r?\n', index)
-                              return (end_index and end_index or #input) + 1
+                              return (select(2, input:find('\r?\n', index)) or
+                                      #input) + 1
                             end)))
 lex:add_style('hr', 'back:$(color.black),eolfilled')
 
@@ -76,7 +78,7 @@ lex:add_rule('link_label',
                                        lexer.delimited_range("'", false, true) +
                                        lexer.delimited_range('()')))^-1)
 lex:add_style('link_label', lexer.STYLE_LABEL)
-lex:add_style('link_url', lexer.STYLE_CONSTANT .. ',underlined')
+lex:add_style('link_url', 'underlined')
 
 lex:add_rule('link',
              token('link', P('!')^-1 * lexer.delimited_range('[]') *
@@ -84,23 +86,43 @@ lex:add_rule('link',
                             (S(' \t')^1 *
                              lexer.delimited_range('"', false, true))^-1 * ')' +
                             S(' \t')^0 * lexer.delimited_range('[]')) +
-                           P('http') * P('s')^-1 * P('://') * (lexer.any - lexer.space)^1))
+                           'http' * P('s')^-1 * '://' *
+                           (lexer.any - lexer.space)^1))
 lex:add_style('link', 'underlined')
 
-lex:add_rule('strong', token('strong', P('**') * (lexer.any - '**')^0 *
-                                       P('**')^-1 +
-                                       P('__') * (lexer.any - '__')^0 *
-                                       P('__')^-1))
-lex:add_style('strong', lexer.STYLE_CLASS .. ',bold')
-lex:add_rule('em', token('em', lexer.delimited_range('*', true, true) +
-                               lexer.delimited_range('_', true, true)))
-lex:add_style('em', lexer.STYLE_KEYWORD .. ',italics')
+local punct_space = lexer.punct + lexer.space
+
+-- Handles flanking delimiters as described in
+-- https://github.github.com/gfm/#emphasis-and-strong-emphasis in the cases
+-- where simple delimited ranges are not sufficient.
+local function flanked_range(s, not_inword)
+  local fl_char = lexer.any - s - lexer.space
+  local left_fl = lpeg.B(punct_space - s) * s * #fl_char +
+                  s * #(fl_char - lexer.punct)
+  local right_fl = lpeg.B(lexer.punct) * s * #(punct_space - s) +
+                   lpeg.B(fl_char) * s
+  return left_fl * (lexer.any - ('\n' * blank_line)
+                              - (not_inword and s * #punct_space or s))^0 *
+         right_fl
+end
+
+lex:add_rule('strong',
+             token('strong', flanked_range('**') +
+                             (lpeg.B(punct_space) + #lexer.starts_line('_')) *
+                             flanked_range('__', true) * #(punct_space + -1)))
+lex:add_style('strong', 'bold')
+
+lex:add_rule('em',
+             token('em', flanked_range('*') +
+                         (lpeg.B(punct_space) + #lexer.starts_line('_')) *
+                         flanked_range('_', true) * #(punct_space + -1)))
+lex:add_style('em', 'italics')
 
 -- Embedded HTML.
 local html = lexer.load('html')
-local start_rule = lexer.starts_line(S(' \t')^0) * #P('<') *
-                   html:get_rule('element')
-local end_rule = token(lexer.DEFAULT, P('\n')) -- TODO: lexer.WHITESPACE errors
+local html_element = html:get_rule('element')
+local start_rule = lexer.starts_line(S(' \t')^0) * #P('<') * html_element
+local end_rule = lexer.newline * blank_line
 lex:embed(html, start_rule, end_rule)
 
 return lex
