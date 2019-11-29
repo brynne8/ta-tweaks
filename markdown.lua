@@ -121,8 +121,13 @@ lex:add_style('em', 'italics')
 -- Embedded HTML.
 local html = lexer.load('html')
 local html_element = html:get_rule('element')
-local start_rule = lexer.starts_line(S(' \t')^0) * #P('<') * html_element
-local end_rule = lexer.newline * blank_line
-lex:embed(html, start_rule, end_rule)
+local html_start = lexer.starts_line(S(' \t')^0) * #P('<') * html_element
+local html_end = lexer.newline * blank_line
+lex:embed(html, html_start, html_end)
+
+-- Embedded LaTeX
+local math = lexer.load('latex')
+local display_math = lexer.starts_line('$$') * #lexer.newline
+lex:embed(math, display_math, display_math)
 
 return lex
