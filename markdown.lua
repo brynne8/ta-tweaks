@@ -37,8 +37,7 @@ local function equalcap (s, i, c)
   if s:sub(i, e - 1) == c then return e else return nil end
 end
 
-local code_line = lexer.to_eol(lexer.starts_line(P(' ')^4 + '\t') * -P('<')) *
-  lexer.newline^-1
+local code_line = lexer.to_eol(lexer.starts_line(P(' ')^4 + '\t')) * lexer.newline^-1
 local code_block = lexer.range(lexer.starts_line('```'), '\n```' * blank_line)
 local code_span
 do
@@ -110,9 +109,9 @@ lex:add_style('em', 'italics')
 
 -- Embedded HTML.
 local html = lexer.load('html')
-local start_rule = lexer.starts_line(S(' \t')^0) * #P('<') *
+local start_rule = lexer.starts_line(P(' ')^-3) * #P('<') *
   html:get_rule('element')
-local end_rule = token(lexer.DEFAULT, (lpeg.B('>') + P('\n')) * blank_line) -- TODO: lexer.WHITESPACE errors
+local end_rule = token(lexer.DEFAULT, P('\n') * blank_line) -- TODO: lexer.WHITESPACE errors
 lex:embed(html, start_rule, end_rule)
 
 return lex
