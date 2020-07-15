@@ -14,10 +14,10 @@ lex:add_rule('comment', token(lexer.COMMENT, lexer.to_eol('--')))
 local name = (lexer.alpha + '_') * (lexer.alnum + '_')^0
 
 -- Classes
-local defined = P('%') * name
+local defined = token(lexer.CLASS, P('%') * name)
 local range = lexer.any * '-' * (lexer.any - ']')
-local item = defined + range + lexer.any
-lex:add_rule('class', token(lexer.DEFAULT, P('[') * P('^')^-1 * item * (-P(']') * item)^0 * ']'))
+local item = defined + token(lexer.DEFAULT, range + lexer.any)
+lex:add_rule('class', token(lexer.DEFAULT, P('[') * P('^')^-1) * item * (-P(']') * item)^0 * ']')
 
 -- Strings
 local sq_str = lexer.range("'")
@@ -35,6 +35,7 @@ lex:add_rule('rcap', token(lexer.OPERATOR, S('-=~') * '>') * lexer.space^0 * (nu
 -- Operators.
 lex:add_rule('operator', token(lexer.OPERATOR, S('<-/&!+*=')))
 
+lex:add_rule('defined', defined)
 
 lex:add_rule('terminal', token(lexer.VARIABLE, name))
 
