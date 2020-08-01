@@ -18,14 +18,14 @@ module('_M.file_browser')]]
 M.dir_filters = {}
 
 M.styles = setmetatable({
-  directory = 5, -- keyword style
-  link = 4, -- number style
-  socket = 7, -- operator style
+  directory = 6, -- keyword style
+  link = 5, -- number style
+  socket = 8, -- operator style
 }, {__index = function() return 0 end})
 
 local function highlight_folder(start_line)
   if not (buffer._type or ''):match('^%[File Browser') then return end
-  for i = start_line and start_line or 0, buffer.line_count - 1 do
+  for i = start_line and start_line or 1, buffer.line_count do
     local line = buffer:get_line(i)
     if line:find('[/\\][\r\n]*$') then
       buffer:start_styling(buffer:position_from_line(i), 0xFF)
@@ -39,9 +39,9 @@ local function print_listing(dir)
   buffer.read_only = false
   -- Retrieve listing for dir.
   local listing = {}
-  lfs.dir_foreach(dir, function(path)
+  for path in lfs.walk(dir, buffer._filter, 0, true) do
     listing[#listing + 1] = path
-  end, buffer._filter, 0, true)
+  end
   table.sort(listing)
   -- Print listing for dir, styling directories, symlinks, etc.
   local line_num = buffer:line_from_position(buffer.current_pos)
@@ -165,7 +165,7 @@ events.connect('char_added', function(code)
   elseif code == string.byte('p') then
     buffer:line_up()
   elseif code == string.byte('N') then
-    for i = line_num + 1, buffer.line_count - 1 do
+    for i = line_num + 1, buffer.line_count do
       buffer:line_down()
       if buffer.line_indentation[i] <= indent then break end
     end
@@ -175,7 +175,7 @@ events.connect('char_added', function(code)
       if buffer.line_indentation[i] <= indent then break end
     end
   elseif code == string.byte('f') then
-    for i = line_num + 1, buffer.line_count - 1 do
+    for i = line_num + 1, buffer.line_count do
       if buffer.line_indentation[i] < indent then break end
       buffer:line_down()
     end
@@ -183,6 +183,29 @@ events.connect('char_added', function(code)
     for i = line_num - 1, 0, -1 do
       if buffer.line_indentation[i] < indent then break end
       buffer:line_up()
+    end
+  elseif code == string.byte('d') then
+    local path = get_path(line_num)
+    local btn = ui.dialogs.ok_msgbox({
+      title = 'Remove',
+      text = 'Delete this file / folder?'
+    })
+    ui.statusbar_text = path
+    if btn == 1 then
+      if path:sub(-1, -1) == (not WIN32 and '/' or '\\') then
+        if WIN32 then os.execute('rd /s/q "'..path..'"')
+        else os.execute('rm -rf "'..path..'"') end
+      else
+        os.remove(path)
+      end
+      buffer.read_only = false
+      buffer:line_delete()
+      while line_num <= buffer.line_count do
+        if buffer.line_indentation[line_num] <= indent then break end
+        buffer:line_delete()
+      end
+      buffer.read_only = true
+      buffer:set_save_point()
     end
   end
 end)
@@ -198,14 +221,14 @@ end)
 events.connect(events.BUFFER_AFTER_SWITCH, highlight_folder)
 events.connect(events.VIEW_AFTER_SWITCH, highlight_folder)
 
-keys['cp'] = function ()
+keys['ctrl+p'] = function ()
   if not M.root_dir then return end
   local file_list = {}
   local path_list = {}
-  lfs.dir_foreach(M.root_dir, function (filename)
+  for filename in lfs.walk(M.root_dir, buffer._filter, 9) do
     table.insert(file_list, filename)
     table.insert(path_list, filename:sub(#M.root_dir + 2))
-  end, buffer._filter, 9)
+  end 
   local button, i = ui.dialogs.filteredlist{
     title = _L['Open'], columns = _L['File'], items = path_list,
     width = CURSES and ui.size[1] - 2 or nil
