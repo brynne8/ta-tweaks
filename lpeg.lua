@@ -1,5 +1,5 @@
 -- Copyright 2006-2020 Mitchell mitchell.att.foicica.com. See License.txt.
--- MediaWiki LPeg lexer.
+-- LPeg.re LPeg lexer.
 -- Contributed by Alexander Misel.
 
 local lexer = require('lexer')
@@ -20,8 +20,8 @@ local item = defined + token(lexer.DEFAULT, range + lexer.any)
 lex:add_rule('class', token(lexer.DEFAULT, P('[') * P('^')^-1) * item * (-P(']') * item)^0 * ']')
 
 -- Strings
-local sq_str = lexer.range("'")
-local dq_str = lexer.range('"')
+local sq_str = lexer.range("'", nil, false)
+local dq_str = lexer.range('"', nil, false)
 local str = token(lexer.STRING, sq_str + dq_str)
 lex:add_rule('string', str)
 
