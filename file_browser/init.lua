@@ -190,11 +190,10 @@ events.connect('char_added', function(code)
       title = 'Remove',
       text = 'Delete this file / folder?'
     })
-    ui.statusbar_text = path
     if btn == 1 then
       if path:sub(-1, -1) == (not WIN32 and '/' or '\\') then
-        if WIN32 then os.execute('rd /s/q "'..path..'"')
-        else os.execute('rm -rf "'..path..'"') end
+        if WIN32 then os.spawn('rd /s/q "'..path..'"')
+        else os.spawn('rm -rf "'..path..'"') end
       else
         os.remove(path)
       end
@@ -204,6 +203,7 @@ events.connect('char_added', function(code)
         if buffer.line_indentation[line_num] <= indent then break end
         buffer:line_delete()
       end
+      if line_num ~= 1 then highlight_folder(line_num - 1) end
       buffer.read_only = true
       buffer:set_save_point()
     end
