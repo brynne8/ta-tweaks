@@ -16,7 +16,7 @@ lex:add_rule('error', -B(lexer.alpha) * token(lexer.ERROR, word_match([[
 
 -- Keywords.
 lex:add_rule('keyword', token(lexer.KEYWORD, word_match[[
-  WARNING WARN NOTICE INFO DEBUG FINE TRACE FINER FINEST info notice
+  WARNING WARN NOTICE INFO DEBUG FINE TRACE FINER FINEST
 ]] + B('[') * lexer.word * #P(']')))
 
 -- Date and time
