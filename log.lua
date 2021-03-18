@@ -40,14 +40,14 @@ local dq_str = lexer.range('"', true)
 lex:add_rule('string', token(lexer.STRING, sq_str + dq_str))
 
 -- Namespaces
-local ns_boundary = lexer.alnum + S([[_/\]])
-local word_char = lexer.alnum + S('_-')
-lex:add_rule('namespace', token(lexer.FUNCTION, -B(ns_boundary + '(') * (lexer.alpha * word_char^0 * '.')^1 *
-  (word_char + S('<>$'))^1 * -ns_boundary
+local ns_boundary = lexer.alnum + S([[_/\.]])
+local word_char = lexer.alnum + S('_-$')
+lex:add_rule('namespace', token(lexer.FUNCTION, -B(ns_boundary + S('(,-')) * (lexer.alpha * word_char^0 * '.')^1 *
+  (word_char + S('<>'))^1 * -ns_boundary
 ))
 
 -- Numbers.
-lex:add_rule('number', token(lexer.NUMBER, -B(lexer.digit) * lexer.number))
+lex:add_rule('number', token(lexer.NUMBER, -B(lexer.alnum) * lexer.number))
 
 -- Operators.
 lex:add_rule('operator', token(lexer.OPERATOR, S('+-*/%^=<>,.{}[]()')))
